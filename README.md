@@ -22,17 +22,30 @@ De los 10,345 registros, **6,305 corresponden a usuarios que pagaron (60.9%)** y
 
 ### Selección de Features
 
-De las 17 variables disponibles, se seleccionaron las **5 más relevantes** para el objetivo del modelo, basándose en su importancia calculada mediante una correlación de Pearson con `default_flag`:
+Para determinar qué variables incluir en el modelo se calculó la
+**correlación de Pearson** entre cada variable numérica del dataset y la
+variable objetivo `default_flag`. Se estableció un umbral mínimo de
+correlación absoluta de **0.10**, seleccionando únicamente las features
+que superan ese valor, lo que indica una relación lineal significativa
+con el target.
 
-| Feature | Tipo |
-|---|---|
-| `risk_score` | numérico |
-| `credit_score` | numérico |
-| `repayment_delay_days` | numérico | 
-| `monthly_income` | numérico |
-| `missed_payments` | numérico |
+Las **features seleccionadas** son:
 
-Por lo tanto, variables como `user_id`, `transaction_date` y `location` fueron descartadas por no aportar valor predictivo al modelo.
+| Feature | Tipo | Descripción | Correlación absoluta |
+|---|---|---|---|
+| `risk_score` | numerico | Score de riesgo calculado del usuario (0–398) Más alto = mayor riesgo | 0.40 |
+| `credit_score` | 	numérico | Puntaje crediticio estándar (300–850) | 0.32 |
+| `repayment_delay_days` | 	numérico | Días de retraso en pagos anteriores (0–33) | 0.28 |
+| `monthly_income` | 	numérico | Ingreso mensual del usuario en USD | 0.27 |
+| `missed_payments` | 	numérico | Número de pagos omitidos (0-7) | 0.27 |
+| `debt_to_income_ratio` | numérico | Razón deuda / ingreso mensual | 0.17 |
+
+Variables como `bnpl_installments` (0.01), `app_usage_frequency` (0.004)
+y `location` fueron descartadas por no superar el umbral, indicando que
+no tienen una relación lineal significativa.
+Variables no numéricas como `user_id`, `transaction_date` y `location` fueron descartadas por no aportar valor predictivo al modelo.
+
+<img width="889" height="489" alt="Correlación absoluta con default_flag: criterio de selección de features" src="https://github.com/user-attachments/assets/c643277f-7a14-4187-a2b3-6ed2edf5bfd7" />
 
 ### Separación del Set de Entrenamiento y Prueba
 
@@ -50,8 +63,8 @@ Las features seleccionadas presentan rangos de magnitud muy distintos entre sí.
 
 Para eliminar este sesgo, se aplicó **Standardization**, que transforma cada valor según la fórmula:
 
-```
-z = (x - μ) / σ
-```
+
+$$z = \frac{x - \mu}{\sigma}$$
+
 
 Esto garantiza que todas las features tengan **media 0 y desviación estándar 1**, permitiendo que el modelo evalúe cada variable en igualdad de condiciones. La media y desviación estándar se calcularon **únicamente con el set de entrenamiento** y se aplicaron al set de prueba, evitando cualquier fuga de información hacia los datos de evaluación.
