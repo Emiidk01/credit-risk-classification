@@ -109,8 +109,9 @@ Adicionalmente, Akinjole et al. (2024) refuerzan la importancia de reportar Prec
 
 | Clase | Precision | Recall | F1-Score |
 |---|---|---|---|
-| Paid (0) | 0.72 | 0.86 | 0.78 |
-| Default (1) | 0.67 | 0.45 | 0.54 |
+| Paid (0) | 0.70 | 0.92 | 0.80 |
+| Default (1) | 0.76 | 0.40 | 0.53 |
+| **Accuracy** | | | **0.71** |
  
 La **matriz de confusión** se incluye como herramienta de interpretación visual, diferenciando entre verdaderos positivos, verdaderos negativos, falsos positivos y falsos negativos.
 
@@ -120,3 +121,50 @@ La **matriz de confusión** se incluye como herramienta de interpretación visua
 > Chang, V., Sivakulasingam, S., Wang, H., Wong, S. T., Ganatra, M. A., & Luo, J. (2024). Credit Risk Prediction Using Machine Learning and Deep Learning: A Study on Credit Card Customers. *Risks*, 12(11), 174. https://doi.org/10.3390/risks12110174
  
 > Akinjole, A., Shobayo, O., Popoola, J., Okoyeigbo, O., & Ogunleye, B. (2024). Ensemble-Based Machine Learning Algorithm for Loan Default Risk Prediction. *Mathematics*, 12(21), 3423. https://doi.org/10.3390/math12213423
+
+## Refinamiento del Modelo
+ 
+### Diagnóstico del modelo base
+ 
+El modelo v1 presentó un **Recall de 0.40 en la clase Default (1)**, lo que significa que dejaba pasar el 60% de los incumplimientos reales. En un contexto de riesgo crediticio, este es el error más costoso, ya que un default no detectado representa una pérdida directa para el proveedor BNPL.
+
+### Ajustes realizados
+ 
+**1. Class weight balancing**
+Se asignaron pesos inversamente proporcionales a la frecuencia de cada clase mediante weighted cross-entropy. Ya que fue una técnica que emplee debido a que  que mis clases estaban ligeramente desbalanceados, cosa que habia notado y que supuse que me daria un problema. El uso de `class_weight` corrige este sesgo penalizando más los errores cometidos sobre defaults durante el entrenamiento, que en este caso es la clase minoritaria.
+
+**2. Dropout (0.3 y 0.2)**
+Se agregaron capas de Dropout tras cada capa oculta para reducir el overfitting, forzando al modelo a aprender representaciones más generalizables (Srivastava et al., 2014).
+ 
+**3. EarlyStopping**
+Se reemplazaron las 50 épocas fijas por entrenamiento con parada temprana, monitoreando `val_loss` con una paciencia de 10 épocas. Prechelt (2012) establece que detener el entrenamiento en el momento adecuado evita que el modelo memorice los datos de entrenamiento y pierda capacidad de predecir correctamente datos nuevos.
+
+### Resultados — Modelo v2 (refinado)
+ 
+| Clase | Precision | Recall | F1-Score |
+|---|---|---|---|
+| Paid (0) | 0.79 | 0.57 | 0.66 |
+| Default (1) | 0.54 | 0.76 | 0.63 |
+| **Accuracy** | | | **0.65** |
+ 
+### Comparación v1 vs v2
+ 
+| Métrica | Modelo v1 | Modelo v2 | Cambio |
+|---|---|---|---|
+| Accuracy | 0.71 | 0.65 | -0.06 |
+| Precision Default (1) | 0.76 | 0.54 | -0.22 |
+| **Recall Default (1)** | **0.40** | **0.76** | **+0.36** |
+| F1-Score Default (1) | 0.53 | 0.63 | **+0.10** |
+
+
+<img width="506" height="390" alt="Matriz de confusion modelo 2" src="https://github.com/user-attachments/assets/07b3f27a-eda1-4289-8eb4-4dd068f24cdd" />
+
+### Observaciones finales
+
+El refinamiento estuvo orientado a mejorar la detección de usuarios con riesgo de default, que era la debilidad más crítica del modelo v1. Mediante la incorporación de class weight balancing, Dropout y EarlyStopping, el modelo v2 logró subir el Recall de Default de 0.40 a 0.76, detectando correctamente el 76% de los incumplimientos reales frente al 40% del modelo anterior. El F1-Score de Default también mejoró de 0.53 a 0.63.
+ 
+Este avance tiene un costo: la Accuracy general bajó de 0.71 a 0.65 y la Precision de Default disminuyó de 0.76 a 0.54, lo que significa que el modelo v2 genera más falsas alarmas. Sin embargo, en un contexto de riesgo crediticio este trade-off es aceptable, ya que el costo de no detectar un default real es mayor que el costo de rechazar a alguien que si podría pagar.
+
+> Prechelt, L. (2012). Early Stopping — But When? In: Neural Networks: Tricks of the Trade. Lecture Notes in Computer Science, vol 7700. Springer. https://doi.org/10.1007/978-3-642-35289-8_5
+ 
+> Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., & Salakhutdinov, R. (2014). Dropout: A simple way to prevent neural networks from overfitting. *Journal of Machine Learning Research*, 15(1), 1929–1958.
