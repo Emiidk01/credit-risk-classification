@@ -131,7 +131,7 @@ El modelo v1 presentó un **Recall de 0.40 en la clase Default (1)**, lo que sig
 ### Ajustes realizados
  
 **1. Class weight balancing**
-Se asignaron pesos inversamente proporcionales a la frecuencia de cada clase mediante weighted cross-entropy. Ya que fue una técnica que emplee debido a que  que mis clases estaban ligeramente desbalanceados, cosa que habia notado y que supuse que me daria un problema. El uso de `class_weight` corrige este sesgo penalizando más los errores cometidos sobre defaults durante el entrenamiento, que en este caso es la clase minoritaria.
+Se asignaron pesos inversamente proporcionales a la frecuencia de cada clase mediante weighted cross-entropy. Ya que fue una técnica que emplee debido a que  que mis clases estaban ligeramente desbalanceados, cosa que habia notado y que supuse que me daria un problema. El uso de `class_weight` corrige este sesgo penalizando más los errores cometidos sobre defaults durante el entrenamiento, que en este caso es la clase minoritaria. Bakırarar y Elhan (2023) evidencian su efectividad.
 
 **2. Dropout (0.3 y 0.2)**
 Se agregaron capas de Dropout tras cada capa oculta para reducir el overfitting, forzando al modelo a aprender representaciones más generalizables (Srivastava et al., 2014).
@@ -164,6 +164,8 @@ Se reemplazaron las 50 épocas fijas por entrenamiento con parada temprana, moni
 El refinamiento estuvo orientado a mejorar la detección de usuarios con riesgo de default, que era la debilidad más crítica del modelo v1. Mediante la incorporación de class weight balancing, Dropout y EarlyStopping, el modelo v2 logró subir el Recall de Default de 0.40 a 0.76, detectando correctamente el 76% de los incumplimientos reales frente al 40% del modelo anterior. El F1-Score de Default también mejoró de 0.53 a 0.63.
  
 Este avance tiene un costo: la Accuracy general bajó de 0.71 a 0.65 y la Precision de Default disminuyó de 0.76 a 0.54, lo que significa que el modelo v2 genera más falsas alarmas. Sin embargo, en un contexto de riesgo crediticio este trade-off es aceptable, ya que el costo de no detectar un default real es mayor que el costo de rechazar a alguien que si podría pagar.
+
+> Bakırarar, Batuhan & ELHAN, Atilla. (2023). Class Weighting Technique to Deal with Imbalanced Class Problem in Machine Learning: Methodological Research. Turkiye Klinikleri Journal of Biostatistics. 15. 19-29. 10.5336/biostatic.2022-93961. 
 
 > Prechelt, L. (2012). Early Stopping — But When? In: Neural Networks: Tricks of the Trade. Lecture Notes in Computer Science, vol 7700. Springer. https://doi.org/10.1007/978-3-642-35289-8_5
  
