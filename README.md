@@ -128,10 +128,12 @@ La **matriz de confusión** se incluye como herramienta de interpretación visua
  
 El modelo v1 presentó un **Recall de 0.40 en la clase Default (1)**, lo que significa que dejaba pasar el 60% de los incumplimientos reales. En un contexto de riesgo crediticio, este es el error más costoso, ya que un default no detectado representa una pérdida directa para el proveedor BNPL.
 
-### Ajustes realizados
+### Primer refinamiento (Modelo v2.0)
+
+**Ajustes aplicados:**
  
 **1. Class weight balancing**
-Se asignaron pesos inversamente proporcionales a la frecuencia de cada clase mediante weighted cross-entropy. Ya que fue una técnica que emplee debido a que  que mis clases estaban ligeramente desbalanceados, cosa que habia notado y que supuse que me daria un problema. El uso de `class_weight` corrige este sesgo penalizando más los errores cometidos sobre defaults durante el entrenamiento, que en este caso es la clase minoritaria. Bakırarar y Elhan (2023) evidencian su efectividad.
+Se asignaron pesos inversamente proporcionales a la frecuencia de cada clase mediante weighted cross-entropy. Las clases estaban ligeramente desbalanceadas (60.9% / 39.1%), lo que hacía que el modelo favoreciera la clase mayoritaria durante el entrenamiento. El uso de `class_weight` corrige este sesgo penalizando más los errores cometidos sobre defaults, que en este caso es la clase minoritaria. Bakırarar y Elhan (2023) evidencian su efectividad en escenarios de desbalance de clases.
 
 **2. Dropout (0.3 y 0.2)**
 Se agregaron capas de Dropout tras cada capa oculta para reducir el overfitting, forzando al modelo a aprender representaciones más generalizables (Srivastava et al., 2014).
@@ -139,7 +141,7 @@ Se agregaron capas de Dropout tras cada capa oculta para reducir el overfitting,
 **3. EarlyStopping**
 Se reemplazaron las 50 épocas fijas por entrenamiento con parada temprana, monitoreando `val_loss` con una paciencia de 10 épocas. Prechelt (2012) establece que detener el entrenamiento en el momento adecuado evita que el modelo memorice los datos de entrenamiento y pierda capacidad de predecir correctamente datos nuevos.
 
-### Resultados — Modelo v2 (refinado)
+### Resultados — Modelo v2.0 (refinado)
  
 | Clase | Precision | Recall | F1-Score |
 |---|---|---|---|
@@ -156,14 +158,45 @@ Se reemplazaron las 50 épocas fijas por entrenamiento con parada temprana, moni
 | **Recall Default (1)** | **0.40** | **0.76** | **+0.36** |
 | F1-Score Default (1) | 0.53 | 0.63 | **+0.10** |
 
+**Observación:** El Recall de Default subió de 0.40 a 0.76, una mejora significativa. Sin embargo, los falsos positivos aumentaron considerablemente: el modelo clasificó como default a 629 de 1,252 usuarios que en realidad pagarían. Esto indicó que la combinación de Dropout agresivo y class_weight estaba acumulando efectos, generando un sesgo excesivo hacia la clase Default que requería corrección.
 
 <img width="506" height="390" alt="Matriz de confusion modelo 2" src="https://github.com/user-attachments/assets/07b3f27a-eda1-4289-8eb4-4dd068f24cdd" />
 
+### Segundo refinamiento después de retroalimentación (Modelo v2.1)
+
+**Problema identificado:** El primer refinamiento obtuvo demasiados falsos positivos.Despues de experimentar, me percaté que Dropout (0.3 y 0.2) combinado con class_weight aplicadas simultáneamente empujaban al modelo a sobrecompensar hacia la clase minoritaria.
+
+**Ajuste aplicado:**
+
+Para atender a esto, eliminé las capas de Dropout, manteniendo únicamente el class_weight balancing y el EarlyStopping. Después de experimentar y jugar con los valores me di cuenta que el Dropout que introducía aleatoriedad durante el entrenamiento que, sumada a la penalización del class_weight, distorsionaba las predicciones sobre la clase Paid. Al removerlo, el modelo conserva el incentivo correcto de detectar defaults sin el ruido adicional que causaba el exceso de falsos positivos.
+
+**Resultados Modelo v2.1:**
+ 
+| Clase | Precision | Recall | F1-Score |
+|---|---|---|---|
+| Paid (0) | 0.77 | 0.56 | 0.65 |
+| Default (1) | 0.54 | 0.76 | 0.63 |
+| **Accuracy** | | | **0.64** |
+
+<img width="506" height="390" alt="image" src="https://github.com/user-attachments/assets/fdd962e5-6c67-40cd-a855-6b7f945b3dd5" />
+
+### Comparación final: v1 vs v2.1
+ 
+| Métrica | Modelo v1 (base) | Modelo v3 (final) | Cambio |
+|---|---|---|---|
+| Accuracy | 0.71 | 0.64 | -0.07 |
+| Precision Default (1) | 0.76 | 0.54 | -0.22 |
+| **Recall Default (1)** | **0.40** | **0.76** | **+0.36** |
+| F1-Score Default (1) | 0.53 | 0.63 | +0.10 |
+| Falsos negativos | ~491 | 204 | -287 |
+
 ### Observaciones finales
 
-El refinamiento estuvo orientado a mejorar la detección de usuarios con riesgo de default, que era la debilidad más crítica del modelo v1. Mediante la incorporación de class weight balancing, Dropout y EarlyStopping, el modelo v2 logró subir el Recall de Default de 0.40 a 0.76, detectando correctamente el 76% de los incumplimientos reales frente al 40% del modelo anterior. El F1-Score de Default también mejoró de 0.53 a 0.63.
+El proceso de refinamiento se llevó a cabo en dos iteraciones. En la primera se identificó el problema principal del modelo base (Recall de 0.40 en Default) y se aplicaron tres técnicas simultáneamente: class_weight, Dropout y EarlyStopping, logrando subir el Recall a 0.76. Sin embargo, esto generó un exceso de falsos positivos que indicó un sesgo demasiado agresivo hacia la clase Default. En la segunda iteración se eliminó el Dropout, encontrando un balance más razonable pero manteniendo un Recall final de 0.76 pero una reducción de falsos negativos de ~491 a 204.
  
-Este avance tiene un costo: la Accuracy general bajó de 0.71 a 0.65 y la Precision de Default disminuyó de 0.76 a 0.54, lo que significa que el modelo v2 genera más falsas alarmas. Sin embargo, en un contexto de riesgo crediticio este trade-off es aceptable, ya que el costo de no detectar un default real es mayor que el costo de rechazar a alguien que si podría pagar.
+La Accuracy general bajó de 0.71 a 0.64 y la Precision de Default disminuyó de 0.76 a 0.54, lo que significa que el modelo final genera más falsas alarmas que el modelo base. Sin embargo, en un contexto de riesgo crediticio pienso que este enfoque es aceptable, ya que el costo de no detectar un default real es mayor que el costo de rechazar a alguien que sí podría pagar. 
+
+Para concluir, la segunda iteración que consistía en tratar de obtener una mayor capacidad y reducir los falsos positivos, no fue tan exitosa como pensaba. Los resultados no fueron los esperados, y al experimentar cambiando los valores de los hiperparametros, pude percatarme que la mejora no era del todo significativa en comparación con la primera iteración de refinamiento. Sin embargo, me veo de cualquier manera en reportar los resultados de este proyecto, resultando en que la estrategía utilizada en la segunda iteración no tuvo un granimpacto como yo esperaba. Para el futuro, la lección que aprendo es probar siempre con tecnicas de balanceo distintas y probar cual me resultaba mejor.
 
 > Bakırarar, Batuhan & ELHAN, Atilla. (2023). Class Weighting Technique to Deal with Imbalanced Class Problem in Machine Learning: Methodological Research. Turkiye Klinikleri Journal of Biostatistics. 15. 19-29. 10.5336/biostatic.2022-93961. 
 
